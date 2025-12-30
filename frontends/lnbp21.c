@@ -191,4 +191,4 @@ EXPORT_SYMBOL_GPL(lnbp21_attach);
 
 MODULE_DESCRIPTION("Driver for lnb supply and control ic lnbp21, lnbh24");
 MODULE_AUTHOR("Oliver Endriss, Igor M. Liplianin");
-MODULE_LICENSE("GPL");
+MODULE_VERSION("0.9.40");MODULE_LICENSE("GPL");

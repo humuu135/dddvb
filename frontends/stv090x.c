@@ -5258,4 +5258,4 @@ EXPORT_SYMBOL_GPL(stv090x_attach);
 MODULE_PARM_DESC(verbose, "Set Verbosity level");
 MODULE_AUTHOR("Manu Abraham");
 MODULE_DESCRIPTION("STV090x Multi-Std Broadcast frontend");
-MODULE_LICENSE("GPL");
+MODULE_VERSION("0.9.40");MODULE_LICENSE("GPL");

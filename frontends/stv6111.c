@@ -754,7 +754,7 @@ EXPORT_SYMBOL_GPL(stv6111_attach);
 
 MODULE_DESCRIPTION("STV6111 driver");
 MODULE_AUTHOR("Ralph Metzler, Manfred Voelkel");
-MODULE_LICENSE("GPL v2");
+MODULE_VERSION("0.9.40");MODULE_LICENSE("GPL v2");
 
 /*
  * Local variables:
