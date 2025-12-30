@@ -53,6 +53,10 @@ static int input_diseqc_sequence_length = 1;
 module_param_array(input_diseqc_sequence, byte, &input_diseqc_sequence_length, 0444);
 MODULE_PARM_DESC(input_diseqc_sequence, "DiSEqC sequence to select input. Last byte & 15 selects input.");
 
+static int lnb_in_use_only_voltage = 1;
+module_param(lnb_in_use_only_voltage, int, 0444);
+MODULE_PARM_DESC(lnb_in_use_only_voltage, "Apply voltage only to LNB in use.");
+
 /* MAX LNB interface related functions */
 
 static int lnb_command(struct ddb *dev, u32 link, u32 lnb, u32 cmd)
@@ -253,6 +257,61 @@ static int max_set_input(struct dvb_frontend *fe, int in)
 	return res;
 }
 
+static int max_get_tuner(struct ddb_dvb *dvb)
+{
+	int tuner = 0;
+	if (old_quattro) {
+		if (dvb->tone == SEC_TONE_ON)
+			tuner |= 2;
+		if (dvb->voltage == SEC_VOLTAGE_18)
+			tuner |= 1;
+	} else {
+		if (dvb->tone == SEC_TONE_ON)
+			tuner |= 1;
+		if (dvb->voltage == SEC_VOLTAGE_18)
+			tuner |= 2;
+	}
+	return tuner;
+}
+
+static void max_fmode1_set_voltages(struct dvb_frontend *fe)
+{
+	struct ddb_input *input = fe->sec_priv;
+	u32 lnr = input->port->lnr;
+	struct ddb *dev = input->port->dev;
+	u32 port_num = dev->port_num;
+	struct ddb_port *ports = dev->port;
+	bool use_tuner[4] = { false, false, false, false };
+
+	for(int i = 0; i < port_num; i++) {
+		struct ddb_port *port = &ports[i];
+		if (port->lnr == lnr) {
+			for (int j = 0; j < 2; j++ ) {
+				struct ddb_dvb *dvb = &port->dvb[j];
+				if (dvb->voltage != SEC_VOLTAGE_OFF) {
+					use_tuner[max_get_tuner(dvb)] = true;
+				}
+			}
+		}
+	}
+
+	lnb_set_voltage(dev, lnr, 0, use_tuner[0] ? SEC_VOLTAGE_13 : SEC_VOLTAGE_OFF);
+	if (old_quattro) {
+		lnb_set_voltage(dev, lnr, 1, use_tuner[1] ? SEC_VOLTAGE_18 : SEC_VOLTAGE_OFF);
+		lnb_set_voltage(dev, lnr, 2, use_tuner[2] ? SEC_VOLTAGE_13 : SEC_VOLTAGE_OFF);
+		dev_info(dev->dev, "Set voltage %d(VL)(3V), %d(HL)(3H), %d(VH)(4V), %d(HH)(4H)\n"
+			, use_tuner[0] ? 13 : 0 , use_tuner[1] ? 18 : 0
+			, use_tuner[2] ? 13 : 0 , use_tuner[3] ? 18 : 0);
+	} else {
+		lnb_set_voltage(dev, lnr, 1, use_tuner[1] ? SEC_VOLTAGE_13 : SEC_VOLTAGE_OFF);
+		lnb_set_voltage(dev, lnr, 2, use_tuner[2] ? SEC_VOLTAGE_18 : SEC_VOLTAGE_OFF);
+		dev_info(dev->dev, "Set voltage %d(VL)(3V), %d(VH)(4V), %d(HL)(3H), %d(HH)(4H)\n"
+			, use_tuner[0] ? 13 : 0 , use_tuner[1] ? 13 : 0
+			, use_tuner[2] ? 18 : 0 , use_tuner[3] ? 18 : 0);
+	}
+	lnb_set_voltage(dev, lnr, 3, use_tuner[3] ? SEC_VOLTAGE_18 : SEC_VOLTAGE_OFF);
+}
+
 static int max_set_tone(struct dvb_frontend *fe, enum fe_sec_tone_mode tone)
 {
 	struct ddb_input *input = fe->sec_priv;
@@ -272,6 +331,13 @@ static int max_set_tone(struct dvb_frontend *fe, enum fe_sec_tone_mode tone)
 		res = lnb_set_tone(dev, port->lnr, dvb->input, tone);
 		break;
 	case 1:
+		if (lnb_in_use_only_voltage) {
+			tuner = max_get_tuner(dvb);
+			res = max_set_input_unlocked(fe, tuner);
+			max_fmode1_set_voltages(fe);
+			break;
+		}
+		fallthrough;
 	case 2:
 		if (old_quattro) {
 			if (dvb->tone == SEC_TONE_ON)
@@ -321,6 +387,13 @@ static int max_set_voltage(struct dvb_frontend *fe, enum fe_sec_voltage voltage)
 		res = lnb_set_voltage(dev, port->lnr, dvb->input, voltage);
 		break;
 	case 1:
+		if (lnb_in_use_only_voltage) {
+			tuner = max_get_tuner(dvb);
+			res = max_set_input_unlocked(fe, tuner);
+			max_fmode1_set_voltages(fe);
+			break;
+		}
+		fallthrough;
 	case 2:
 		if (voltage == SEC_VOLTAGE_OFF)
 			dev->link[port->lnr].lnb.voltages &=
@@ -547,6 +620,7 @@ int ddb_fe_attach_mxl5xx(struct ddb_input *input)
 	dvb->fe->ops.set_input = max_set_input;
 #endif
 	dvb->input = tuner;
+	dvb->voltage = SEC_VOLTAGE_OFF;
 	return 0;
 }
 
@@ -649,5 +723,6 @@ int ddb_fe_attach_mci(struct ddb_input *input, u32 type)
 		dvb->fe->ops.set_input = max_set_input;
 #endif
 	}
+	dvb->voltage = SEC_VOLTAGE_OFF;
 	return 0;
 }
