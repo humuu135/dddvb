@@ -927,7 +927,7 @@ EXPORT_SYMBOL_GPL(tda18212dd_attach);
 
 MODULE_DESCRIPTION("TDA18212 driver");
 MODULE_AUTHOR("Ralph Metzler, Manfred Voelkel");
-MODULE_LICENSE("GPL v2");
+MODULE_VERSION("0.9.42");MODULE_LICENSE("GPL v2");
 
 /*
  * Local variables:
